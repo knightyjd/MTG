@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Collection Manager</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind for Inter font -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        // Custom colors inspired by MTG mana symbols
+                        'mtg-w': '#f8f8f8', // White/Plains
+                        'mtg-u': '#90c3e7', // Blue/Island
+                        'mtg-b': '#323232', // Black/Swamp
+                        'mtg-r': '#e89e6a', // Red/Mountain
+                        'mtg-g': '#90cc90', // Green/Forest
+                        'mtg-bg': '#0f172a', // Slate-900 for a deeper dark background
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            /* *** BACKGROUND SETTING: Check this line carefully! *** */
+            /* The file name in the quotes MUST match your image file exactly. */
+            background-image: url('mtg-art.jpg'); 
+            background-size: cover; 
+            background-attachment: fixed;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* 2. Dark Overlay for Text Readability - RESTORED for image background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* 60% black transparency overlay on top of the image */
+            background-color: rgba(0, 0, 0, 0.6); 
+            z-index: -1;
+        }
+        
+
+        /* Basic styling for the table row based on color */
+        .color-w { background-color: #f8f8f8; color: #1e293b; }
+        .color-u { background-color: #90c3e7; color: #1e293b; }
+        .color-b { background-color: #323232; color: #f8f8f8; }
+        .color-r { background-color: #e89e6a; color: #1e293b; }
+        .color-g { background-color: #90cc90; color: #1e293b; }
+        .color-m { background-color: #c0c0c0; color: #1e293b; } /* Multi/Colorless */
+
+        /* Custom scrollbar for better look */
+        .card-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .card-container::-webkit-scrollbar-thumb {
+            background-color: #475569;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8">
+
+    <div id="app" class="max-w-7xl mx-auto">
+        <!-- Header: UPDATED Gradient for a fiery look -->
+        <header class="text-center mb-10">
+            <h1 class="text-5xl sm:text-6xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400">
+                Jim's Magic Collection
+            </h1>
+            <!-- Shows the total number of cards loaded -->
+            <p class="text-gray-300 text-lg font-semibold">Total Cards Loaded: <span id="totalCardCount" class="text-orange-300">0</span></p>
+        </header>
+        
+        <!-- REMOVED HIDDEN FILE INPUT -->
+        
+        <!-- Main Content Area: Two-Column Layout on Large Screens -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Control Panel (Filter and Image Display) - Column 1 -->
+            <div class="lg:col-span-1 space-y-6">
+                
+                <!-- Search and Filter Section -->
+                <div id="filterSection" class="bg-black/60 backdrop-blur-sm p-6 rounded-2xl shadow-2xl border border-red-700/50">
+                    <h2 class="text-xl font-semibold text-white mb-4">1. Filter Cards</h2>
+                    <div class="space-y-4">
+                        <input type="text" id="filterName" placeholder="Search Card Name..."
+                            class="p-3 w-full rounded-lg bg-slate-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent border-transparent"
+                            oninput="filterCards()">
+                        
+                        <select id="filterColor" onchange="filterCards()"
+                            class="p-3 w-full rounded-lg bg-slate-700 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent border-transparent">
+                            <option value="">All Mana Colors</option>
+                            <option value="W" class="text-black">White (W)</option>
+                            <option value="U" class="text-black">Blue (U)</option>
+                            <option value="B" class="text-white">Black (B)</option>
+                            <option value="R" class="text-black">Red (R)</option>
+                            <option value="G" class="text-black">Green (G)</option>
+                            <option value="M">Multi / Colorless (M)</option>
+                        </select>
+
+                        <input type="text" id="filterAbility" placeholder="Search Ability (e.g., Flying)..."
+                            class="p-3 w-full rounded-lg bg-slate-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent border-transparent"
+                            oninput="filterCards()">
+                    </div>
+                </div>
+                
+                <!-- Card Image Display Section -->
+                <div id="imageDisplaySection" class="bg-black/60 backdrop-blur-sm p-6 rounded-2xl shadow-2xl border border-red-700/50">
+                    <h2 id="selectedCardName" class="text-xl font-semibold text-white mb-4 text-center truncate">Select a Card</h2>
+                    <div class="flex justify-center">
+                         <!-- Placeholder image size is standard MTG card ratio (223x310) -->
+                        <img id="cardImage" src="https://placehold.co/223x310/1f2937/9ca3af?text=Select%20a%20Card" 
+                             alt="Selected Card Image" class="rounded-xl shadow-2xl max-w-full h-auto">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Table (Main Content) - Column 2 -->
+            <div class="lg:col-span-2 bg-black/60 backdrop-blur-sm p-6 rounded-2xl shadow-2xl border border-red-700/50 overflow-hidden">
+                <h2 class="text-xl font-semibold text-white mb-4">2. Results (<span id="resultCount">0</span> Cards)</h2>
+                <div id="cardTableContainer" class="overflow-y-auto card-container max-h-[70vh] rounded-xl border border-slate-700">
+                    <table class="min-w-full divide-y divide-slate-700">
+                        <!-- Table Header: UPDATED Background and Text Color -->
+                        <thead class="bg-red-900/50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-red-200 uppercase tracking-wider rounded-tl-xl">
+                                    Card Name
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-red-200 uppercase tracking-wider">
+                                    Color
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-red-200 uppercase tracking-wider rounded-tr-xl">
+                                    Abilities
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="cardList" class="divide-y divide-slate-700">
+                            <!-- Card data will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+                <p id="noResults" class="text-center text-gray-400 py-6 hidden">No cards match your current filters.</p>
+            </div>
+            
+        </div>
+
+    </div>
+
+    <script>
+        // NOTE: To permanently store your collection, modify the 'allCardData' array below. 
+        // Simply edit this array in the Canvas and the data will load automatically every time.
+        // Format of each card object: 
+        // { name: 'Card Name', color: 'Mana Color', abilities: 'Text', normalizedColor: 'W/U/B/R/G/M', imageUrl: 'URL' }
+        let allCardData = [
+            // Sample Data
+            { name: 'Black Lotus', color: 'Colorless', abilities: 'Tap, Sacrifice Black Lotus: Add three mana of any one color to your mana pool.', normalizedColor: 'M', imageUrl: 'https://cards.scryfall.io/large/front/f/b/fb6f62b7-1c1a-471d-a31c-7f551b8c3867.jpg?1614041764' },
+            { name: 'Grizzly Bears', color: 'Green', abilities: 'None', normalizedColor: 'G', imageUrl: 'https://cards.scryfall.io/large/front/e/0/e06b72a2-3f82-4467-9c3f-c68991b1236a.jpg?1562947134' },
+            { name: 'Lightning Bolt', color: 'Red', abilities: 'Lightning Bolt deals 3 damage to any target.', normalizedColor: 'R', imageUrl: 'https://cards.scryfall.io/large/front/f/5/f586a117-9b28-4422-9957-c8a77d01865b.jpg?1674421528' },
+            { name: 'Counterspell', color: 'Blue', abilities: 'Counter target spell.', normalizedColor: 'U', imageUrl: 'https://cards.scryfall.io/large/front/6/1/61e8997a-9694-4d83-82a8-8e6f39e38e1a.jpg?1674420317' },
+            { name: 'Swords to Plowshares', color: 'White', abilities: 'Exile target creature. Its controller gains life equal to its power.', normalizedColor: 'W', imageUrl: 'https://cards.scryfall.io/large/front/7/6/763d89d4-06d9-43c2-a1f7-d2b14644e591.jpg?1674420317' },
+            // ADDED: Think Twice (1U cost, but mono-Blue color identity)
+            { name: 'Think Twice', color: 'Blue', abilities: 'Draw a card. Flashback 2U.', normalizedColor: 'U', imageUrl: 'https://cards.scryfall.io/large/front/4/0/40a7e9bb-0772-4539-bbf9-7a95d5e47947.jpg?17304897' },
+            { name: 'Tarmogoyf', color: 'Green/Blue', abilities: "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1.", normalizedColor: 'M', imageUrl: 'https://cards.scryfall.io/large/front/c/c/ccab3d5e-d4d1-450f-8971-d41c8884a29a.jpg?1547517874' }
+        ];
+
+        // Global variable for total count
+        let totalCardsLoaded = 0;
+
+        /**
+         * Updates the displayed total number of cards loaded into the app.
+         * @param {number} count - The total number of cards.
+         */
+        function updateTotalCountDisplay(count) {
+            totalCardsLoaded = count;
+            const totalCountEl = document.getElementById('totalCardCount');
+            if (totalCountEl) {
+                totalCountEl.textContent = count;
+            }
+        }
+
+
+        /**
+         * The CSV parsing function is no longer needed as data is managed directly in the JS array.
+         */
+        
+        /**
+         * The file handling function is no longer needed as data is managed directly in the JS array.
+         */
+        
+        /**
+         * Displays the image and name of the currently selected card.
+         * @param {Object} card - The card object containing name and imageUrl.
+         */
+        function displayCardImage(card) {
+            const imageEl = document.getElementById('cardImage');
+            const nameEl = document.getElementById('selectedCardName');
+            const placeholderSrc = 'https://placehold.co/223x310/1f2937/9ca3af?text=Select%20a%20Card';
+
+            if (card && card.imageUrl) {
+                imageEl.src = card.imageUrl;
+                imageEl.onerror = () => imageEl.src = placeholderSrc; // Fallback if image fails to load
+                nameEl.textContent = card.name;
+            } else {
+                imageEl.src = placeholderSrc;
+                nameEl.textContent = 'Select a Card';
+            }
+        }
+
+
+        /**
+         * Applies current filter settings to the card data and re-renders the table.
+         */
+        function filterCards() {
+            const nameFilter = document.getElementById('filterName').value.toLowerCase();
+            const colorFilter = document.getElementById('filterColor').value.toUpperCase();
+            const abilityFilter = document.getElementById('filterAbility').value.toLowerCase();
+
+            const filteredData = allCardData.filter(card => {
+                let matches = true;
+
+                // 1. Name Filter
+                if (nameFilter && !card.name.toLowerCase().includes(nameFilter)) {
+                    matches = false;
+                }
+
+                // 2. Color Filter (uses the normalized color)
+                if (colorFilter && colorFilter !== card.normalizedColor) {
+                    matches = false;
+                }
+                
+                // 3. Ability Filter
+                if (abilityFilter && !card.abilities.toLowerCase().includes(abilityFilter)) {
+                    matches = false;
+                }
+
+                return matches;
+            });
+
+            renderTable(filteredData);
+            
+            // On filtering, select the first card in the new filtered list (if any)
+            if (filteredData.length > 0) {
+                displayCardImage(filteredData[0]);
+            } else {
+                displayCardImage(null);
+            }
+        }
+
+        /**
+         * Renders the filtered card data into the table.
+         * @param {Array<Object>} data - The array of card objects to display.
+         */
+        function renderTable(data) {
+            const listEl = document.getElementById('cardList');
+            const resultCountEl = document.getElementById('resultCount');
+            const noResultsEl = document.getElementById('noResults');
+            
+            listEl.innerHTML = '';
+            resultCountEl.textContent = data.length;
+
+            if (data.length === 0) {
+                noResultsEl.classList.remove('hidden');
+                return;
+            }
+
+            noResultsEl.classList.add('hidden');
+            
+            data.forEach(card => {
+                const colorClass = `color-${card.normalizedColor.toLowerCase()}`;
+                
+                // Create a table row element
+                const row = document.createElement('tr');
+                // Added cursor-pointer class and onclick handler
+                row.className = `transition duration-150 ease-in-out hover:bg-slate-700/70 text-sm cursor-pointer ${colorClass}`;
+                row.onclick = () => displayCardImage(card);
+
+                
+                // Card Name Cell
+                const nameCell = document.createElement('td');
+                nameCell.className = 'px-4 py-3 font-medium';
+                nameCell.textContent = card.name;
+                row.appendChild(nameCell);
+
+                // Mana Colour Cell
+                const colorCell = document.createElement('td');
+                colorCell.className = 'px-4 py-3 uppercase font-bold';
+                colorCell.textContent = card.color;
+                row.appendChild(colorCell);
+
+                // Abilities Cell
+                const abilitiesCell = document.createElement('td');
+                abilitiesCell.className = 'px-4 py-3';
+                abilitiesCell.textContent = card.abilities;
+                row.appendChild(abilitiesCell);
+
+                listEl.appendChild(row);
+            });
+        }
+        
+        // Initialize the app by setting the initial total count, filtering, and displaying the first card.
+        updateTotalCountDisplay(allCardData.length);
+        filterCards(); 
+    </script>
+</body>
+</html>
