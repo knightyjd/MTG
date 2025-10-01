@@ -54,7 +54,7 @@
         /* Basic styling for the table row based on color */
         .color-w { background-color: #f8f8f8; color: #1e293b; }
         .color-u { background-color: #90c3e7; color: #1e293b; }
-        .color-b { background-color: #323232; color: #f8f8f8; }
+        .color-b { background-color: #323232; color: #f8ff8f8; }
         .color-r { background-color: #e89e6a; color: #1e293b; }
         .color-g { background-color: #90cc90; color: #1e293b; }
         .color-m { background-color: #c0c0c0; color: #1e293b; } /* Multi/Colorless */
@@ -187,9 +187,39 @@
         import { getFirestore, collection, addDoc, onSnapshot, query, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // IMPORTANT: Global variables are provided by the Canvas environment.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- START: CONFIGURATION FOR GITHUB DEPLOYMENT ---
+        /**
+         * Function to safely retrieve Firebase configuration.
+         * When running on Canvas, it uses the provided config.
+         * When running on GitHub Pages, it uses the hardcoded config below.
+         */
+        function getFirebaseConfig() {
+            // 1. Prioritize configuration provided by the Canvas environment
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                return JSON.parse(__firebase_config);
+            }
+            
+            // 2. Fallback for external hosting (GitHub Pages). 
+            // !!! IMPORTANT: You MUST replace the dummy values below with your actual Firebase project config.
+            // Find this config in your Firebase project console under Project Settings > General.
+            console.warn("ATTENTION: Using placeholder Firebase config. Replace the values below for successful GitHub deployment!");
+            return {
+                apiKey: "YOUR_API_KEY", 
+                authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_PROJECT_ID.appspot.com",
+                messagingSenderId: "YOUR_SENDER_ID",
+                appId: "YOUR_APP_ID"
+            };
+        }
+
+        const firebaseConfig = getFirebaseConfig();
+        // Use environment App ID or fallback to the project ID from the config
+        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId || 'default-app-id'; 
+        // --- END: CONFIGURATION FOR GITHUB DEPLOYMENT ---
+
 
         setLogLevel('debug'); // Enable Firestore logging
 
@@ -238,8 +268,14 @@
          */
         async function initializeFirebase() {
             try {
-                if (!firebaseConfig) {
-                    throw new Error("Firebase config is missing.");
+                // Check if the configuration has been replaced for external hosting
+                if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+                     // Only warn if we are outside the Canvas environment and using placeholders
+                     if (typeof __firebase_config === 'undefined') {
+                        document.getElementById('authStatus').textContent = 'CONFIG MISSING! Check console.';
+                        console.error("External Hosting Error: You must replace the YOUR_... placeholders in the getFirebaseConfig function.");
+                        return;
+                     }
                 }
 
                 const app = initializeApp(firebaseConfig);
@@ -249,7 +285,7 @@
                 const statusEl = document.getElementById('authStatus');
                 statusEl.textContent = 'Authenticating...';
 
-                // Sign in using the custom token or anonymously if the token is missing
+                // Sign in using the custom token (Canvas) or anonymously (GitHub/External)
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
@@ -284,6 +320,7 @@
                 return;
             }
 
+            // Path ensures data is private to this user and this app ID
             const collectionPath = `artifacts/${appId}/users/${userId}/mtg_collection`;
             const userRef = collection(db, collectionPath);
             const q = query(userRef);
@@ -292,7 +329,6 @@
             onSnapshot(q, (snapshot) => {
                 const newCardData = [];
                 snapshot.forEach(doc => {
-                    // Add the Firestore document ID to the card object for potential future deletion/updates
                     newCardData.push({ id: doc.id, ...doc.data() });
                 });
                 
